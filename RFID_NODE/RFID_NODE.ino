@@ -43,8 +43,8 @@ bool validateCheckSum(uint8_t *IDBuffr) {
     else return false;
 }
 
-uint32_t getTag(uint8_t *IDBuffr) {
-  return (IDBuffr[1] << 24 + IDBuffr[2] << 16 + IDBuffr[3] << 8 + IDBuffr[4]);
+uint32_t getTagValue(uint8_t *IDBuffr) {
+  return (IDBuffr[1] << 24 | IDBuffr[2] << 16 | IDBuffr[3] << 8 | IDBuffr[4]);
 }
 
 void setup() {
@@ -76,25 +76,20 @@ void loop() {
       }
     }
   }
+
+  uint32_t readTag;
   
-  if(flagPacketReadComplete) {
-    
-    Serial.println((const char *)readBuffr);
-    
-    parseTag(readBuffr, tagBuffr);    
-    
-    char buffr[100];
-    
-//    sprintf(buffr, "%d\t%d\t%d\t%d\t%d\t%d", tagBuffr[0], tagBuffr[1], tagBuffr[2], tagBuffr[3], tagBuffr[4], tagBuffr[5]);    
-//    Serial.println((const char *)buffr);
-      if(validateCheckSum(tagBuffr)) Serial.println("1. Check SUM OKAY!");
-      else Serial.println("Check SUM ERROR !");
-      
-      if(validateCheckSum(tagBuffr)) Serial.println("2. Check SUM OKAY!");
-      else Serial.println("Check SUM ERROR !");
-    
+  if(flagPacketReadComplete) {           
+    parseTag(readBuffr, tagBuffr);            
+    if(validateCheckSum(tagBuffr)) {
+      readTag = getTagValue(tagBuffr);      
+      Serial.println(readTag);
+    } else {
+       Serial.println("Check sum error !");      
+    }    
     memset(readBuffr, 0, 20); 
   }
+  
 }
 
 
