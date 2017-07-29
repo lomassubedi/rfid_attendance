@@ -1,45 +1,37 @@
 void parseTag(uint8_t *rawBuffr, uint8_t *IDBuffr) {
   
       uint8_t dataBuffr[12];
-//      uint8_t dataBuffr[] = "2E00AF0EC9B4";
-      uint8_t indx, j = 0;
-      uint8_t tmpMSB, tmpLSB;
-    
+      uint8_t indx i, j;
+      
       memcpy(dataBuffr, &rawBuffr[1], 12);
       
-    for(indx = 0; indx < 12; indx += 2) {           
+    for(; indx < 12; indx += 2, j++) {
+      
+      uint8_t tmpMSB, tmpLSB;
       
       tmpMSB = dataBuffr[indx];
+  
       tmpLSB = dataBuffr[indx + 1];
       
       if(tmpMSB > 0x39) tmpMSB = ((10 + tmpMSB) - 0x41);
       else tmpMSB = tmpMSB - 0x30;
       
       if(tmpLSB > 0x39) tmpLSB = ((10 + tmpLSB) - 0x41);
-      else tmpLSB = tmpLSB - 0x30;     
+      else tmpLSB = tmpLSB - 0x30;
       
-      IDBuffr[j++] = (tmpMSB << 4 | tmpLSB); //dataBuffr[indx]            
+      IDBuffr[j] = (tmpMSB << 4 + tmpLSB); //dataBuffr[indx]
     }      
-//    Serial.print("\nData ----------  ");
-//    Serial.println(IDBuffr[0]);
-//    Serial.println(IDBuffr[1]);
-//    Serial.println(IDBuffr[2]);
-//    Serial.println(IDBuffr[3]);
-//    Serial.println(IDBuffr[4]);
-//    Serial.println(IDBuffr[5]);
-////    Serial.println("  ---------- ");
-  return;
+
+    Serial.println((const char *)IDBuffr);
 }
 
 bool validateCheckSum(uint8_t *IDBuffr) {
-    uint16_t sum = 0;
+    uint8_t sum = 0;
     for (uint8_t i = 0; i < 5; i++) {
       sum += IDBuffr[i];
     }
-    
-    sum = sum & 0xFF;
-                  
-    if(sum == IDBuffr[5]) return true;
+
+    if(sum == IDBuffr[6]) return true;
     else return false;
 }
 
@@ -84,14 +76,9 @@ void loop() {
     parseTag(readBuffr, tagBuffr);    
     
     char buffr[100];
+    sprintf(buffr, "%d\t%d\t%d\t%d\t%d\t%d", tagBuffr[0], tagBuffr[1], tagBuffr[2], tagBuffr[3], tagBuffr[4], tagBuffr[5]);
     
-//    sprintf(buffr, "%d\t%d\t%d\t%d\t%d\t%d", tagBuffr[0], tagBuffr[1], tagBuffr[2], tagBuffr[3], tagBuffr[4], tagBuffr[5]);    
 //    Serial.println((const char *)buffr);
-      if(validateCheckSum(tagBuffr)) Serial.println("1. Check SUM OKAY!");
-      else Serial.println("Check SUM ERROR !");
-      
-      if(validateCheckSum(tagBuffr)) Serial.println("2. Check SUM OKAY!");
-      else Serial.println("Check SUM ERROR !");
     
     memset(readBuffr, 0, 20); 
   }
