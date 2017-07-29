@@ -106,10 +106,8 @@ void setup() {
   uint8_t readEEPBfr[EEPROM_DATA_SIZE];
   
   getEEPROMBytes(readEEPBfr, DEVICE_ID_ADDR, EEPROM_DATA_SIZE);
-  Serial.print("\nDevice ID : ");
-  String str((const char*)readEEPBfr);
-//  Serial.println((const char*)readEEPBfr);
-  Serial.println(str);
+  Serial.print("Device ID : ");
+  Serial.println(readEEPBfr);
 }
 
 uint8_t readBuffr[16];

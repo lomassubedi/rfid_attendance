@@ -2,12 +2,9 @@
 
 #define SERIAL_READ_TIMEOUT 1000
 #define EEPROM_SIZE         255
-
-#define EEPROM_DATA_SIZE    20
-
 #define DEVICE_ID_ADDR      0
-#define SSID_ADDR           (EEPROM_DATA_SIZE + DEVICE_ID_ADDR)
-#define PASSWORD_ADDR       (EEPROM_DATA_SIZE + SSID_ADDR)
+#define SSID_ADDR           20
+#define PASSWORD_ADDR       40
 
 uint8_t serialReadline(char *buff, uint8_t maxbuff, uint16_t timeout) {
   uint16_t buffidx = 0;
@@ -90,26 +87,17 @@ uint32_t getTagValue(uint8_t *IDBuffr) {
 
 void getEEPROMBytes(uint8_t *bytesBuffr, uint16_t initAddr, uint16_t buffrLen) {
   
-  EEPROM.begin(EEPROM_SIZE);  
+  EEPROM.begin(EEPROM_SIZE);
   
-  for(uint16_t i = 0; i < buffrLen; i++)    
-    bytesBuffr[i] = EEPROM.read(i + initAddr);  
-    
-  EEPROM.end();
-  return;
+  for(uint16_t i = 0; i < buffrLen; i++) {
+    bytesBuffr[i] = EEPROM.read(i)
+  }
+  
 }
 
 void setup() {
   Serial.begin(9600);
   EEPROM.begin(EEPROM_SIZE);
-  
-  uint8_t readEEPBfr[EEPROM_DATA_SIZE];
-  
-  getEEPROMBytes(readEEPBfr, DEVICE_ID_ADDR, EEPROM_DATA_SIZE);
-  Serial.print("\nDevice ID : ");
-  String str((const char*)readEEPBfr);
-//  Serial.println((const char*)readEEPBfr);
-  Serial.println(str);
 }
 
 uint8_t readBuffr[16];
