@@ -88,6 +88,40 @@ uint32_t getTagValue(uint8_t *IDBuffr) {
   return (IDBuffr[1] << 24 | IDBuffr[2] << 16 | IDBuffr[3] << 8 | IDBuffr[4]);
 }
 
+void clearEEPROM(uint16_t initAddr, uint16_t byteLen) {
+  
+  EEPROM.begin(EEPROM_SIZE);
+    for(uint8_t i = 0; i < byteLen; i++)
+      EEPROM.write(i + initAddr, (byte)0);     //clearing
+//      delay(1);
+   EEPROM.commit();
+   EEPROM.end();
+   
+   return;
+}
+
+uint8_t writeEEPROMBytes(uint8_t *bytesBuffr, uint16_t initAddr, uint16_t buffrLen) {
+  
+   EEPROM.begin(EEPROM_SIZE);
+    
+    for(uint8_t i = 0; i < buffrLen ; i++)
+      EEPROM.write(i + initAddr, (byte)bytesBuffr[i]);     
+//      delay(1); 
+    EEPROM.commit();
+  
+    char eepromReadBack[20];
+    uint8_t errorCount = 0;
+
+    for(uint8_t i = 0; i < buffrLen ; i++) {
+      eepromReadBack[i] = EEPROM.read(i + initAddr);
+      delay(1);
+      if(!(eepromReadBack[i] == bytesBuffr[i])) errorCount++; 
+    }
+    EEPROM.end();
+    
+    return errorCount;
+}
+
 void getEEPROMBytes(uint8_t *bytesBuffr, uint16_t initAddr, uint16_t buffrLen) {
   
   EEPROM.begin(EEPROM_SIZE);  
@@ -101,15 +135,35 @@ void getEEPROMBytes(uint8_t *bytesBuffr, uint16_t initAddr, uint16_t buffrLen) {
 
 void setup() {
   Serial.begin(9600);
+  
+  delay(2000);
+  
+  Serial.println("\n-----------------------------\nInitializing hardware modules...\n-----------------------------");
+  
   EEPROM.begin(EEPROM_SIZE);
+
+  delay(2000);
   
   uint8_t readEEPBfr[EEPROM_DATA_SIZE];
   
   getEEPROMBytes(readEEPBfr, DEVICE_ID_ADDR, EEPROM_DATA_SIZE);
-  Serial.print("\nDevice ID : ");
-  String str((const char*)readEEPBfr);
+  Serial.print("Device ID : ");
+  String strID((char*)readEEPBfr);
 //  Serial.println((const char*)readEEPBfr);
-  Serial.println(str);
+  Serial.println(strID);
+
+  getEEPROMBytes(readEEPBfr, SSID_ADDR, EEPROM_DATA_SIZE);
+  Serial.print("WiFi SSID : ");
+  String strSSID((char*)readEEPBfr);
+//  Serial.println((const char*)readEEPBfr);
+  Serial.println(strSSID);
+
+  getEEPROMBytes(readEEPBfr, PASSWORD_ADDR, EEPROM_DATA_SIZE);
+  Serial.print("WiFi Password : ");
+  String strPassword((char*)readEEPBfr);
+//  Serial.println((const char*)readEEPBfr);
+  Serial.println(strPassword);
+    
 }
 
 uint8_t readBuffr[16];
@@ -139,53 +193,70 @@ void loop() {
   } else if(getChar == 'S') {
     
     Serial.println("\n--------- Welcome to RFID attendence user setting ----------");
-    Serial.print("Set a Device ID>"); 
-       
-    char ReadLineBuffr[50];
     
-    uint8_t charLen = serialReadline(ReadLineBuffr, 20, SERIAL_READ_TIMEOUT);
+    char readLineBuffr[50];
+    uint8_t charLen;
+
+    // --------------- Set Device ID ----------------------
+    Serial.print("Set a Device ID>");               
+    charLen = serialReadline(readLineBuffr, EEPROM_DATA_SIZE, SERIAL_READ_TIMEOUT);
 
     for(uint8_t i = 0; i < charLen; i++)
-      Serial.write(ReadLineBuffr[i]);
+      Serial.write(readLineBuffr[i]);
+    Serial.write('\n');
+
+    // Clear EEPROM space for writing device ID
+    clearEEPROM(DEVICE_ID_ADDR, EEPROM_DATA_SIZE);
     
-      Serial.print("\nReceived byte length! ");
-      Serial.println(charLen);
-//    Serial.println((const char *))
+    // Write device ID
+    if(!writeEEPROMBytes((uint8_t *)readLineBuffr, DEVICE_ID_ADDR, charLen)) {
+      Serial.print("Successfully updated device ID : ");
+      String str(readLineBuffr);
+      Serial.println(str);
+    }else {
+      Serial.println("Failed updating Device ID !");
+    }         
 
-    EEPROM.begin(EEPROM_SIZE);
-//    for(uint8_t i = 0; i < charLen; i++)
-//      EEPROM.write(i, (byte)0);     //clearing
-//      delay(1);
-//    EEPROM.commit();
-////    EEPROM.end();
-
-//    EEPROM.begin(EEPROM_SIZE);
-    for(uint8_t i = 0; i < charLen ; i++)
-      EEPROM.write(i, (byte)ReadLineBuffr[i]);     
-      delay(1); 
-    EEPROM.commit();
-//    EEPROM.end();    
     
+    // ------------- Set WiFi SSID -----------------
+    Serial.print("Set SSID>");               
+    charLen = serialReadline(readLineBuffr, EEPROM_DATA_SIZE, SERIAL_READ_TIMEOUT);
 
-    char eepromReadBack[20];
-    uint8_t errorCount = 0;
+    for(uint8_t i = 0; i < charLen; i++)
+      Serial.write(readLineBuffr[i]);
+    Serial.write('\n');
 
-//    EEPROM.begin(EEPROM_SIZE);
-    for(uint8_t i = 0; i < charLen ; i++) {
-      eepromReadBack[i] = EEPROM.read(i);
-      delay(1);
-      if(!(eepromReadBack[i] == ReadLineBuffr[i])) errorCount++; 
+    // Clear EEPROM space for writing WiFi SSID
+    clearEEPROM(SSID_ADDR, EEPROM_DATA_SIZE);
+    
+    // Write WiFi SSID
+    if(!writeEEPROMBytes((uint8_t *)readLineBuffr, SSID_ADDR, charLen)) {
+      Serial.print("Successfully updated wifi SSID : ");
+      String str(readLineBuffr);
+      Serial.println(str);
+    }else {
+      Serial.println("Failed updating wifi SSID !");
     }
-    EEPROM.end();
-    
+     
+    // ------------- Set WiFi Password -----------------
+    Serial.print("Set WiFi Password>");               
+    charLen = serialReadline(readLineBuffr, EEPROM_DATA_SIZE, SERIAL_READ_TIMEOUT);
 
-    if(errorCount) {
-      Serial.println("Failed updating Device ID");
-    } else {
-      Serial.print("Successfully updated Device ID : ");
-      Serial.println((const char*)eepromReadBack);
-    }
+    for(uint8_t i = 0; i < charLen; i++)
+      Serial.write(readLineBuffr[i]);
+    Serial.write('\n');
+
+    // Clear EEPROM space for writing WiFi password
+    clearEEPROM(PASSWORD_ADDR, EEPROM_DATA_SIZE);
     
+    // Write WiFi password
+    if(!writeEEPROMBytes((uint8_t *)readLineBuffr, PASSWORD_ADDR, charLen)) {
+      Serial.print("Successfully updated wifi password : ");
+      String str(readLineBuffr);
+      Serial.println(str);
+    }else {
+      Serial.println("Failed updating wifi password !");
+    }
   }
       
   uint32_t readTag;
