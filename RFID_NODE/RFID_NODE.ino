@@ -1,6 +1,8 @@
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
 #include <EEPROM.h>
 
-#define SERIAL_READ_TIMEOUT 1000
+#define SERIAL_READ_TIMEOUT 2000
 #define EEPROM_SIZE         255
 
 #define EEPROM_DATA_SIZE    20
@@ -158,12 +160,30 @@ void setup() {
 //  Serial.println((const char*)readEEPBfr);
   Serial.println(strSSID);
 
-  getEEPROMBytes(readEEPBfr, PASSWORD_ADDR, EEPROM_DATA_SIZE);
+  uint8_t readEEPBfrPass[EEPROM_DATA_SIZE];
+  getEEPROMBytes(readEEPBfrPass, PASSWORD_ADDR, EEPROM_DATA_SIZE);
   Serial.print("WiFi Password : ");
-  String strPassword((char*)readEEPBfr);
+  String strPassword((char*)readEEPBfrPass);
 //  Serial.println((const char*)readEEPBfr);
   Serial.println(strPassword);
-    
+  
+  // Connect to Save SSID and Password
+  WiFi.begin((const char *)readEEPBfr, (const char *)readEEPBfrPass);   //for WiFi connection
+
+  uint8_t cntr = 0;
+  while (WiFi.status() != WL_CONNECTED) {//Wait for the WiFI connection completion
+    delay(500);
+    Serial.print("Waiting for connection with "); 
+    Serial.println((const char *)readEEPBfr);
+    cntr++;
+    if(cntr > 10) break;
+  }
+  
+  if(WiFi.status() == WL_CONNECTED) {
+     Serial.print("Connected to ");
+     Serial.println(strSSID);      
+  }
+  
 }
 
 uint8_t readBuffr[16];
@@ -216,7 +236,6 @@ void loop() {
     }else {
       Serial.println("Failed updating Device ID !");
     }         
-
     
     // ------------- Set WiFi SSID -----------------
     Serial.print("Set SSID>");               
