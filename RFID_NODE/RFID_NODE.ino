@@ -1,6 +1,7 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <EEPROM.h>
+#include <ArduinoJson.h>
 
 #define SERIAL_READ_TIMEOUT 2000
 #define EEPROM_SIZE         255
@@ -172,7 +173,7 @@ void setup() {
 
   uint8_t cntr = 0;
   while (WiFi.status() != WL_CONNECTED) {//Wait for the WiFI connection completion
-    delay(500);
+    delay(1000);
     Serial.print("Waiting for connection with "); 
     Serial.println((const char *)readEEPBfr);
     cntr++;
@@ -183,6 +184,8 @@ void setup() {
      Serial.print("Connected to ");
      Serial.println(strSSID);      
   }
+
+  Serial.println("------------ Ready ----------------");
   
 }
 
@@ -276,6 +279,8 @@ void loop() {
     }else {
       Serial.println("Failed updating wifi password !");
     }
+  } else {
+    // Do nothing ----
   }
       
   uint32_t readTag;
@@ -290,6 +295,73 @@ void loop() {
     }    
     memset(readBuffr, 0, 20); 
   }  
+
+  // --------- Create JSON ----------------
+  char jsonCharBuffer[200];
+  sprintf(jsonCharBuffer, "data=");
+  
+  if(flagPacketReadComplete) {
+    StaticJsonBuffer<200> jsonBuffer;
+    
+    JsonObject& root = jsonBuffer.createObject();  
+    root["tag"] = readTag;
+    root["time"] = "2017-01-01T01:02:03";   
+  
+    root.printTo(&jsonCharBuffer[5], 195);
+    Serial.println(jsonCharBuffer);
+
+//    post_data(readTag);
+  }
+
+  String payload;
+  
+  if(flagPacketReadComplete) {
+
+    if(WiFi.status() == WL_CONNECTED){   // Check WiFi connection status
+  
+       HTTPClient http;    //Declare object of class HTTPClient
+  
+       http.begin("http://192.168.100.5:4044/data");//Specify request destination
+       http.addHeader("Content-Type", "text/plain");  //Specify content-type header
+       http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+       int httpCode = http.POST(jsonCharBuffer);   //Send data
+       
+       payload = http.getString();                  //Get the response payload
+       
+       http.end();  //Close connection
+     }
+     Serial.println("-------------- Response ---------------");
+     Serial.println(payload);     
+//    delay(3000); //for sending this dummy data at interval of 3 secs
+  } 
+
 }
 
+void post_data(int32_t rf){
+  /*Serial.print("rf = ");
+  Serial.println(rf);
+  Serial.print("number = ");
+  Serial.println(number);  
+  */  
+  String payload;
+  if(WiFi.status() == WL_CONNECTED){   //Check WiFi connection status
+     HTTPClient http;    //Declare object of class HTTPClient
+     http.begin("http://192.168.100.5:4044/data");      //Specify request destination
+     http.addHeader("Content-Type", "text/plain");  //Specify content-type header
+     http.addHeader("Content-Type", "application/x-www-form-urlencoded");
 
+      StaticJsonBuffer<200> jsonBuffer;    
+      JsonObject& root = jsonBuffer.createObject();  
+     root["tag"] = rf;
+     root["time"] = "2017-01-01T01:02:03";;
+     char buffer[256];
+     root.printTo(buffer, sizeof(buffer));
+     int httpCode = http.POST(buffer);   //Send data
+     payload = http.getString();                  //Get the response payload
+     http.end();  //Close connection
+   }else{
+     Serial.println("Error in WiFi connection");
+   }
+   Serial.println(payload);
+}
