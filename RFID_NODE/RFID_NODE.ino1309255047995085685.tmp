@@ -3,28 +3,22 @@
 #include <EEPROM.h>
 #include <ArduinoJson.h>
 
-#include "customCodes.h"
-
-#define DEBUG_SERIAL                // Turn ON serial debug 
-
 #define SERIAL_READ_TIMEOUT         2000
-#define EEPROM_SIZE                 3072
+#define EEPROM_SIZE                 255
 
 #define EEPROM_DATA_SIZE            20
+#define TAG_STACK_SIZE              2     // counter of 2 bytes
 
 #define DEVICE_ID_ADDR              0
 #define SSID_ADDR                   (EEPROM_DATA_SIZE + DEVICE_ID_ADDR)
 #define PASSWORD_ADDR               (EEPROM_DATA_SIZE + SSID_ADDR)
 
-#define FAILED_TAG_STACK_PTR_ADDR   (EEPROM_DATA_SIZE + PASSWORD_ADDR)
-#define FAILED_TAG_STACK_ADDR       (FAILED_TAG_STACK_PTR_ADDR + FAILED_TAG_STACK_PTR_ADDR)  
+#define TAG_STACK_ADDR              (EEPROM_DATA_SIZE + PASSWORD_ADDR)          
 
 #define POST_RESPONSE_PAYLOAD_SIZE  100
 #define POST_PAYLOAD_SIZE           200
 
-volatile uint16_t failedTagStackPtr = 0;
-
-const char url[] = "http://192.168.100.6:4044/data";
+const unsigned char url[] = "http://192.168.100.6:4044/data";
 
 uint8_t serialReadline(char *buff, uint8_t maxbuff, uint16_t timeout) {
   uint16_t buffidx = 0;
@@ -150,89 +144,10 @@ void getEEPROMBytes(uint8_t *bytesBuffr, uint16_t initAddr, uint16_t buffrLen) {
   return;
 }
 
-uint16_t intReadEEPROM(uint16_t p_address) {
-  
-     uint8_t bytesInt[2];    
-     
-     getEEPROMBytes(bytesInt, p_address, sizeof(bytesInt));
-                         
-     return ((bytesInt[0] << 0) & 0xFF) + ((bytesInt[1] << 8) & 0xFF00);
-}
-     
-uint8_t intWriteEEPROM(uint16_t p_address, uint16_t p_value) {
-    
-    uint8_t bytesInt[2];
-    
-     bytesInt[0] = ((p_value >> 0) & 0xFF);
-     bytesInt[1] = ((p_value >> 8) & 0xFF);
-          
-     if(writeEEPROMBytes(bytesInt, p_address, sizeof(bytesInt))) {
-      return ERROR_CODE;
-     } else {
-      return SUCESS_CODE;
-     }         
-}
-
-uint8_t addIDToEEPROMStack(uint32_t ID) {
-  
-  uint8_t addrCtr = 0;
-  uint8_t IDbyte[4];
-  
-  IDbyte[0] = (ID & 0xFF);
-  IDbyte[1] = ((ID >> 8) & 0xFF);
-  IDbyte[2] = ((ID >> 16) & 0xFF);
-  IDbyte[3] = ((ID >> 24) & 0xFF);
-
-//  IDbyte[0] = 'L';
-//  IDbyte[1] = 'O';
-//  IDbyte[2] = 'M';
-//  IDbyte[3] = 'E';
-    
-  uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
-  uint16_t byteAddr = (stackPtr * sizeof(uint32_t)) + 1;
-  byteAddr += FAILED_TAG_STACK_ADDR;
-  
-//  uint8_t errorEEPROM = writeEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t));
-
-//  Serial.print("stackPointer : ");
-//  Serial.print(stackPtr);
-//  Serial.print(" EEPROM ERROR  : ");
-  Serial.print("Testing ID bytes : ");
-  for(uint8_t i = 0; i < 4; i++) {
-   Serial.write(IDbyte[i]); 
-  }
-  Serial.print(" Sizeof uint32_t = ");
-  Serial.println(sizeof(uint32_t));    
-  
-  if(writeEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t))) {
-    return ERROR_CODE;
-  } else {
-    stackPtr++;
-    intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, stackPtr);
-    return SUCESS_CODE;        
-  }      
-}
-
-uint32_t getIDFromEEPROMStack() {
-  
-  uint8_t addrCtr = 0;
-  uint8_t IDbyte[4];   
-    
-  uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);  
-  
-  uint16_t byteAddr = (stackPtr * sizeof(uint32_t)) - sizeof(uint32_t) + 1;
-  byteAddr += FAILED_TAG_STACK_ADDR;
-  
-  getEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t));    
-  stackPtr--;
-  intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, stackPtr);
-  return (uint32_t)(IDbyte[3] << 24 | IDbyte[2] << 16 | IDbyte[1] << 8 | IDbyte[0]);
-}
-
-void encodeJson(char * jsonArry, uint16_t arrySize, uint32_t tagValue) {
+void encodeJson(unsigned char * jsonArry, uint16_t arrySize, uint32_t tagValue) {
   
   const char dataString[] = "data=";
-  const uint8_t sizeCharsDataString = sizeof(dataString) - 1; // Omit null character
+  const uint8_t sizeOfDataString = sizeof(dataString);
   
   sprintf(jsonArry, dataString);
    
@@ -242,15 +157,15 @@ void encodeJson(char * jsonArry, uint16_t arrySize, uint32_t tagValue) {
     root["tag"] = tagValue;    
 //    root["time"] = "2017-01-01T01:02:03";   
   
-   root.printTo(&jsonArry[sizeCharsDataString], (arrySize - sizeCharsDataString));
+   root.printTo(&jsonArry[sizeOfDataString], (arrySize - sizeOfDataString));
     
-  #ifdef DEBUG_SERIAL    
-    Serial.println(jsonArry);
-  #endif
+  #ifdef DEBUG_SERIAL
+    Serial.println(jsonCharBuffer);
+  #endf
   return;
 }
 
-uint8_t postToServer(const char *  url, const char * jsonCharArray) {
+uint8_t postToServer(const unsigned char *  url, const char * jsonCharArray) {
 
   String payload;
   char payLoad[POST_RESPONSE_PAYLOAD_SIZE];
@@ -270,30 +185,30 @@ uint8_t postToServer(const char *  url, const char * jsonCharArray) {
        
        http.end();  //Close connection
      }
-
-     payload.toCharArray(payLoad, POST_RESPONSE_PAYLOAD_SIZE);
      
      #ifdef DEBUG_SERIAL
       Serial.println("-------------- Response ---------------");
-      Serial.println(payLoad);     
+      Serial.println(payload);     
       Serial.println("----------------------------------------");
-     #endif                  
+     #endif
+         
+     payload.toCharArray(payLoad, POST_RESPONSE_PAYLOAD_SIZE);
          
      StaticJsonBuffer<200> jsonBuffer;
      JsonObject& root = jsonBuffer.parseObject(payLoad);
 
     if (!root.success())
     {
-      Serial.println("ERROR JSON:  parseObject() failed");
-      return ERROR_JSON_PARSE;
+      Serial.println("parseObject() failed");
+      return 2;
     }
 
      boolean success = root["success"];
 
      if(success == true) {
-      return UPLOAD_SUCESS_TRUE;
+      return 1;
      }
-  return ERROR_SUCESS_FALSE;      
+  return 3;      
 }
 
 void setup() {
@@ -337,37 +252,28 @@ void setup() {
     Serial.print("Waiting for connection with "); 
     Serial.println((const char *)readEEPBfr);
     cntr++;
-    if(cntr > 15) break;
+    if(cntr > 10) break;
   }
   
   if(WiFi.status() == WL_CONNECTED) {
      Serial.print("Connected to ");
      Serial.println(strSSID);      
   }
-  Serial.println("------------ Ready ----------------");
 
-  /*
-   * Initialize SPACE for STACK like memory 
-   * at EEPROM of saveing upload failed RFID tags 
-   */ 
-   if(intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR) == 65535) // If nothing is written in the EEPROM
-     if(intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, 0)) {
-      Serial.println("Initialized space for failed ID to store.");
-     }  
+  Serial.println("------------ Ready ----------------");
+  
 }
 
 uint8_t readBuffr[16];
 uint8_t tagBuffr[6];
-uint32_t timeTrack = 0;
 
 void loop() {
 
   uint8_t getChar = Serial.read();
   uint8_t i = 0;
   bool flagPacketReadComplete = false;
-   
-  if(getChar == 0x02) {
-    timeTrack = millis();    
+  
+  if(getChar == 0x02) {       
     Serial.flush();
     readBuffr[i++] = getChar;    
     while(Serial.available() > 0) {    
@@ -447,18 +353,6 @@ void loop() {
     }else {
       Serial.println("Failed updating wifi password !");
     }
-
-    // ------------------ Ask for restart --------------------------------------
-    Serial.print("Restart hardware module ? [Y]/[N]>");               
-    charLen = serialReadline(readLineBuffr, EEPROM_DATA_SIZE, SERIAL_READ_TIMEOUT);
-    for(uint8_t i = 0; i < charLen; i++)
-      Serial.write(readLineBuffr[i]);
-    Serial.write('\n');
-    
-    if(readLineBuffr[0] == 'Y' || readLineBuffr[0] == 'y') {
-      ESP.restart();
-    }
-    
   } else {
     // Do nothing ----
   }
@@ -474,60 +368,17 @@ void loop() {
        Serial.println("Check sum error !");      
     }    
     memset(readBuffr, 0, 20); 
-    
-    char jsonCharBuffer[POST_PAYLOAD_SIZE];
-    encodeJson(jsonCharBuffer, POST_PAYLOAD_SIZE, readTag); // Create JSON 
-    
-    // post to server and handle if unsuccessfull    
-    if(postToServer(url, jsonCharBuffer) > 1) {
-      Serial.println("\nError updating database...\nUpdating later...");      
-      if(addIDToEEPROMStack(readTag)) {
-        
-        uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
-        char buffr[200];
-        sprintf(buffr, "Saved tag %lu to EEPROM, will be sent later !, PTR = %d", readTag, stackPtr);
-        Serial.println(buffr);         
-      } else {
-        char buffr[200];
-        sprintf(buffr, "Error updating tag \"%lu\" to EEPROM !", readTag);
-        Serial.println(buffr);              
-      }
-    } else {
-      // Do nothing if post is successfull !
-    }
-  }
-  
-   
-  if(!((millis() - timeTrack) % 30000)) {        
-    
-    uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);             
-    while(stackPtr) {         
-                
-        uint32_t missedID = getIDFromEEPROMStack();
-        char jsonCharBuffer[POST_PAYLOAD_SIZE];
+  }  
 
-        uint16_t queuePtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
-        Serial.print("Queue Pointer  = ");
-        Serial.println(queuePtr);
-        
-        encodeJson(jsonCharBuffer, POST_PAYLOAD_SIZE, missedID); // Create JSON 
-        
-        // post to server and handle if unsuccessfull    
-        if(postToServer(url, jsonCharBuffer) > 1) {
-          Serial.println("\nError updating database again ...\nUpdating later...");      
-          if(addIDToEEPROMStack(missedID)) {
-            char buffr[200];
-            sprintf(buffr, "Saved tag %lu to EEPROM, will be sent later !", missedID);
-            Serial.println(buffr);      
-          }
-        } else {
-          char buffr[200];
-          sprintf(buffr, "Updated tag \"%lu\" successfully !", missedID);
-          Serial.println(buffr);      
-        }
-      if(Serial.available() > 0)  break;
-      stackPtr--;
-      delay(500);
-    }              
+  // --------- Create JSON ----------------
+  char jsonCharBuffer[POST_PAYLOAD_SIZE];  
+  
+  if(flagPacketReadComplete) {
+    
+      encodeJson(jsonCharBuffer, POST_PAYLOAD_SIZE, readTag);
   }
+
+  String payload;  
+  if(flagPacketReadComplete) {   
+  } 
 }

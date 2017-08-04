@@ -178,15 +178,10 @@ uint8_t addIDToEEPROMStack(uint32_t ID) {
   uint8_t addrCtr = 0;
   uint8_t IDbyte[4];
   
-  IDbyte[0] = (ID & 0xFF);
+  IDbyte[0] = ((ID >> 0) & 0xFF);
   IDbyte[1] = ((ID >> 8) & 0xFF);
   IDbyte[2] = ((ID >> 16) & 0xFF);
   IDbyte[3] = ((ID >> 24) & 0xFF);
-
-//  IDbyte[0] = 'L';
-//  IDbyte[1] = 'O';
-//  IDbyte[2] = 'M';
-//  IDbyte[3] = 'E';
     
   uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
   uint16_t byteAddr = (stackPtr * sizeof(uint32_t)) + 1;
@@ -197,12 +192,8 @@ uint8_t addIDToEEPROMStack(uint32_t ID) {
 //  Serial.print("stackPointer : ");
 //  Serial.print(stackPtr);
 //  Serial.print(" EEPROM ERROR  : ");
-  Serial.print("Testing ID bytes : ");
-  for(uint8_t i = 0; i < 4; i++) {
-   Serial.write(IDbyte[i]); 
-  }
-  Serial.print(" Sizeof uint32_t = ");
-  Serial.println(sizeof(uint32_t));    
+//  Serial.println(errorEEPROM);
+  
   
   if(writeEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t))) {
     return ERROR_CODE;
@@ -220,8 +211,7 @@ uint32_t getIDFromEEPROMStack() {
     
   uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);  
   
-  uint16_t byteAddr = (stackPtr * sizeof(uint32_t)) - sizeof(uint32_t) + 1;
-  byteAddr += FAILED_TAG_STACK_ADDR;
+  uint16_t byteAddr = (stackPtr * sizeof(uint32_t)) - sizeof(uint32_t);
   
   getEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t));    
   stackPtr--;
@@ -349,11 +339,10 @@ void setup() {
   /*
    * Initialize SPACE for STACK like memory 
    * at EEPROM of saveing upload failed RFID tags 
-   */ 
-   if(intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR) == 65535) // If nothing is written in the EEPROM
-     if(intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, 0)) {
-      Serial.println("Initialized space for failed ID to store.");
-     }  
+   */  
+   if(intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, 0) == 0) {
+    Serial.println("Initialized space for failed ID to store.");
+   }  
 }
 
 uint8_t readBuffr[16];
@@ -482,11 +471,9 @@ void loop() {
     if(postToServer(url, jsonCharBuffer) > 1) {
       Serial.println("\nError updating database...\nUpdating later...");      
       if(addIDToEEPROMStack(readTag)) {
-        
-        uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
         char buffr[200];
-        sprintf(buffr, "Saved tag %lu to EEPROM, will be sent later !, PTR = %d", readTag, stackPtr);
-        Serial.println(buffr);         
+        sprintf(buffr, "Saved tag %lu to EEPROM, will be sent later !", readTag);
+        Serial.println(buffr);      
       } else {
         char buffr[200];
         sprintf(buffr, "Error updating tag \"%lu\" to EEPROM !", readTag);
@@ -496,25 +483,25 @@ void loop() {
       // Do nothing if post is successfull !
     }
   }
-  
-   
-  if(!((millis() - timeTrack) % 30000)) {        
+
+  if((millis() - timeTrack) >= 30000) {        
     
-    uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);             
+    uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
+    
+    Serial.println("I ma here !!");
+    Serial.print("Stack ptr : ");
+    Serial.println(stackPtr);
+    
     while(stackPtr) {         
                 
         uint32_t missedID = getIDFromEEPROMStack();
         char jsonCharBuffer[POST_PAYLOAD_SIZE];
-
-        uint16_t queuePtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
-        Serial.print("Queue Pointer  = ");
-        Serial.println(queuePtr);
         
         encodeJson(jsonCharBuffer, POST_PAYLOAD_SIZE, missedID); // Create JSON 
         
         // post to server and handle if unsuccessfull    
         if(postToServer(url, jsonCharBuffer) > 1) {
-          Serial.println("\nError updating database again ...\nUpdating later...");      
+          Serial.println("\nError updating database...\nUpdating later...");      
           if(addIDToEEPROMStack(missedID)) {
             char buffr[200];
             sprintf(buffr, "Saved tag %lu to EEPROM, will be sent later !", missedID);
@@ -526,8 +513,8 @@ void loop() {
           Serial.println(buffr);      
         }
       if(Serial.available() > 0)  break;
-      stackPtr--;
-      delay(500);
-    }              
+      stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
+    }
+            
   }
 }
