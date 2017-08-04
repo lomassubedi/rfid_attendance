@@ -22,6 +22,9 @@
 #define POST_RESPONSE_PAYLOAD_SIZE  100
 #define POST_PAYLOAD_SIZE           200
 
+const uint8_t LED_RED = 1;
+const uint8_t LED_GREEN = 2;
+
 volatile uint16_t failedTagStackPtr = 0;
 
 const char url[] = "http://192.168.100.6:4044/data";
@@ -327,6 +330,13 @@ void setup() {
      Serial.print("Connected to ");
      Serial.println(strSSID);      
   }
+
+  // ------------ INIT LED pins -------
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);  
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_GREEN, LOW);  
+  
   Serial.println("------------ Ready ----------------");
 
   /*
@@ -463,6 +473,8 @@ void loop() {
     
     // post to server and handle if unsuccessfull    
     if(postToServer(url, jsonCharBuffer) > 1) {
+      digitalWrite(LED_RED, HIGH); // Light UP RED LED if unsuccessful post
+      digitalWrite(LED_GREEN, LOW);
       Serial.println("\nError updating database...\nUpdating later...");      
       if(addIDToEEPROMStack(readTag)) {
         
@@ -476,8 +488,9 @@ void loop() {
         Serial.println(buffr);              
       }
       Serial.println("********************************************************");
-    } else {
-      // Do nothing if post is successfull !
+    } else {        
+      digitalWrite(LED_GREEN, HIGH); // Light UP GREEN LED if successful post
+      digitalWrite(LED_RED, LOW); 
     }
   }
   
@@ -498,6 +511,8 @@ void loop() {
         
         // post to server and handle if unsuccessfull    
         if(postToServer(url, jsonCharBuffer) > 1) {
+          digitalWrite(LED_RED, HIGH); // Light UP RED LED if unsuccessful post
+          digitalWrite(LED_GREEN, LOW);
           Serial.println("\nError updating database again ...\nUpdating later...");      
           if(addIDToEEPROMStack(missedID)) {
             char buffr[200];
@@ -505,6 +520,8 @@ void loop() {
             Serial.println(buffr);      
           }
         } else {
+          digitalWrite(LED_GREEN, HIGH); // Light UP GREEN LED if successful post
+          digitalWrite(LED_RED, LOW); 
           char buffr[200];
           sprintf(buffr, "Updated tag \"%lu\" successfully !", missedID);
           Serial.println(buffr);      
