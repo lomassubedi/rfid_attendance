@@ -182,28 +182,11 @@ uint8_t addIDToEEPROMStack(uint32_t ID) {
   IDbyte[1] = ((ID >> 8) & 0xFF);
   IDbyte[2] = ((ID >> 16) & 0xFF);
   IDbyte[3] = ((ID >> 24) & 0xFF);
-
-//  IDbyte[0] = 'L';
-//  IDbyte[1] = 'O';
-//  IDbyte[2] = 'M';
-//  IDbyte[3] = 'E';
     
   uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
   uint16_t byteAddr = (stackPtr * sizeof(uint32_t)) + 1;
   byteAddr += FAILED_TAG_STACK_ADDR;
-  
-//  uint8_t errorEEPROM = writeEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t));
-
-//  Serial.print("stackPointer : ");
-//  Serial.print(stackPtr);
-//  Serial.print(" EEPROM ERROR  : ");
-  Serial.print("Testing ID bytes : ");
-  for(uint8_t i = 0; i < 4; i++) {
-   Serial.write(IDbyte[i]); 
-  }
-  Serial.print(" Sizeof uint32_t = ");
-  Serial.println(sizeof(uint32_t));    
-  
+    
   if(writeEEPROMBytes(IDbyte, byteAddr, sizeof(uint32_t))) {
     return ERROR_CODE;
   } else {
@@ -469,12 +452,12 @@ void loop() {
     parseTag(readBuffr, tagBuffr);            
     if(validateCheckSum(tagBuffr)) {
       readTag = getTagValue(tagBuffr);      
-      Serial.println(readTag);
+//      Serial.println(readTag);
     } else {
        Serial.println("Check sum error !");      
     }    
     memset(readBuffr, 0, 20); 
-    
+    Serial.println("********************************************************");
     char jsonCharBuffer[POST_PAYLOAD_SIZE];
     encodeJson(jsonCharBuffer, POST_PAYLOAD_SIZE, readTag); // Create JSON 
     
@@ -492,20 +475,21 @@ void loop() {
         sprintf(buffr, "Error updating tag \"%lu\" to EEPROM !", readTag);
         Serial.println(buffr);              
       }
+      Serial.println("********************************************************");
     } else {
       // Do nothing if post is successfull !
     }
   }
   
    
-  if(!((millis() - timeTrack) % 30000)) {        
+  if(!((millis() - timeTrack) % 60000)) {        
     
     uint16_t stackPtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);             
     while(stackPtr) {         
                 
         uint32_t missedID = getIDFromEEPROMStack();
         char jsonCharBuffer[POST_PAYLOAD_SIZE];
-
+        Serial.println("############################################################");
         uint16_t queuePtr = intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR);
         Serial.print("Queue Pointer  = ");
         Serial.println(queuePtr);
@@ -525,9 +509,10 @@ void loop() {
           sprintf(buffr, "Updated tag \"%lu\" successfully !", missedID);
           Serial.println(buffr);      
         }
+      Serial.println("############################################################");
       if(Serial.available() > 0)  break;
       stackPtr--;
-      delay(500);
+//      delay(500);
     }              
   }
 }
