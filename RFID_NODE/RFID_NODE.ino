@@ -2,7 +2,8 @@
 #include <ESP8266WiFi.h>
 #include <EEPROM.h>
 #include <ArduinoJson.h>
-
+//#include <Wire.h>
+//#include "RTClib.h"
 #include "customCodes.h"
 
 #define DEBUG_SERIAL                // Turn ON serial debug 
@@ -10,24 +11,32 @@
 #define SERIAL_READ_TIMEOUT         2000
 #define EEPROM_SIZE                 3072
 
-#define EEPROM_DATA_SIZE            20
+#define EEPROM_DATA_SIZE            50
+
+#define URL_SIZE                    200
 
 #define DEVICE_ID_ADDR              0
 #define SSID_ADDR                   (EEPROM_DATA_SIZE + DEVICE_ID_ADDR)
 #define PASSWORD_ADDR               (EEPROM_DATA_SIZE + SSID_ADDR)
-
-#define FAILED_TAG_STACK_PTR_ADDR   (EEPROM_DATA_SIZE + PASSWORD_ADDR)
+#define URL_ADDR                    (EEPROM_DATA_SIZE + PASSWORD_ADDR)
+ 
+#define FAILED_TAG_STACK_PTR_ADDR   (URL_ADDR + URL_SIZE)
 #define FAILED_TAG_STACK_ADDR       (FAILED_TAG_STACK_PTR_ADDR + FAILED_TAG_STACK_PTR_ADDR)  
 
 #define POST_RESPONSE_PAYLOAD_SIZE  100
 #define POST_PAYLOAD_SIZE           200
 
-const uint8_t LED_RED = 1;
-const uint8_t LED_GREEN = 2;
+//const uint8_t LED_RED = 1;
+//const uint8_t LED_GREEN = 2;
+
+// Initialize RTC
+//RTC_DS1307 rtc;
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+
 
 volatile uint16_t failedTagStackPtr = 0;
 
-const char url[] = "http://192.168.100.6:4044/data";
+const char url[] = "http://192.168.100.56:4044/data";
 
 uint8_t serialReadline(char *buff, uint8_t maxbuff, uint16_t timeout) {
   uint16_t buffidx = 0;
@@ -283,6 +292,7 @@ uint8_t postToServer(const char *  url, const char * jsonCharArray) {
 }
 
 void setup() {
+  
   Serial.begin(9600);
   
   delay(2000);
@@ -291,8 +301,32 @@ void setup() {
   
   EEPROM.begin(EEPROM_SIZE);
 
+  /*
+   uint8_t cntrRTCPull = 0;
+    while (! rtc.begin()) {
+    
+    Serial.println("Couldn't find RTC");
+    
+    cntrRTCPull++;
+    
+    if(cntrRTCPull > 15)
+      break;
+  }
+  if(cntrRTCPull == 15) {
+    Serial.println("No RTC found, program continues !!");
+  }
+
+  if (! rtc.isrunning()) {
+    Serial.println("RTC is NOT running!");
+    // following line sets the RTC to the date & time this sketch was compiled
+     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
+
   delay(2000);
-  
+  */
   uint8_t readEEPBfr[EEPROM_DATA_SIZE];
   
   getEEPROMBytes(readEEPBfr, DEVICE_ID_ADDR, EEPROM_DATA_SIZE);
@@ -313,6 +347,14 @@ void setup() {
   String strPassword((char*)readEEPBfrPass);
 //  Serial.println((const char*)readEEPBfr);
   Serial.println(strPassword);
+
+  uint8_t readEEPBfrURL[URL_SIZE];
+  getEEPROMBytes(readEEPBfrURL,  URL_ADDR, URL_SIZE);
+  Serial.print("URL : ");
+  String strURL((char*)readEEPBfrURL);
+//  Serial.println((const char*)readEEPBfrURL);
+  Serial.println(strURL);
+ 
   
   // Connect to Save SSID and Password
   WiFi.begin((const char *)readEEPBfr, (const char *)readEEPBfrPass);   //for WiFi connection
@@ -332,10 +374,10 @@ void setup() {
   }
 
   // ------------ INIT LED pins -------
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);  
-  digitalWrite(LED_RED, LOW);
-  digitalWrite(LED_GREEN, LOW);  
+//  pinMode(LED_RED, OUTPUT);
+//  pinMode(LED_GREEN, OUTPUT);  
+//  digitalWrite(LED_RED, LOW);
+//  digitalWrite(LED_GREEN, LOW);  
   
   Serial.println("------------ Ready ----------------");
 
@@ -343,6 +385,8 @@ void setup() {
    * Initialize SPACE for STACK like memory 
    * at EEPROM of saveing upload failed RFID tags 
    */ 
+   uint8_t x = intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, 0);
+   
    if(intReadEEPROM(FAILED_TAG_STACK_PTR_ADDR) == 65535) // If nothing is written in the EEPROM
      if(intWriteEEPROM(FAILED_TAG_STACK_PTR_ADDR, 0)) {
       Serial.println("Initialized space for failed ID to store.");
@@ -355,7 +399,10 @@ uint32_t timeTrack = 0;
 
 void loop() {
 
+//  uint8_t getChar = 0;
+//  if(Serial.available() > 0)
   uint8_t getChar = Serial.read();
+//  Serial.write(getChar);
   uint8_t i = 0;
   bool flagPacketReadComplete = false;
    
@@ -378,8 +425,8 @@ void loop() {
     
     Serial.println("\n--------- Welcome to RFID attendence user setting ----------");
     
-    char readLineBuffr[50];
-    uint8_t charLen;
+    char readLineBuffr[250];
+    uint16_t charLen;
 
     // --------------- Set Device ID ----------------------
     Serial.print("Set a Device ID>");               
@@ -441,6 +488,26 @@ void loop() {
       Serial.println("Failed updating wifi password !");
     }
 
+    // ------------- Set url  -------------------
+    Serial.print("Set server url eg [http://192.168.100.56:4044/data] >");               
+    charLen = serialReadline(readLineBuffr, URL_SIZE, SERIAL_READ_TIMEOUT);
+
+    for(uint8_t i = 0; i < charLen; i++)
+      Serial.write(readLineBuffr[i]);
+    Serial.write('\n');
+
+    // Clear EEPROM space for writing WiFi password
+    clearEEPROM(URL_ADDR, URL_SIZE);
+    
+    // Write url for server
+    if(!writeEEPROMBytes((uint8_t *)readLineBuffr, URL_ADDR, charLen)) {
+      Serial.print("Successfully updated server URL : ");
+      String str(readLineBuffr);
+      Serial.println(str);
+    }else {
+      Serial.println("Failed updating server URL !");
+    }
+
     // ------------------ Ask for restart --------------------------------------
     Serial.print("Restart hardware module ? [Y]/[N]>");               
     charLen = serialReadline(readLineBuffr, EEPROM_DATA_SIZE, SERIAL_READ_TIMEOUT);
@@ -473,8 +540,8 @@ void loop() {
     
     // post to server and handle if unsuccessfull    
     if(postToServer(url, jsonCharBuffer) > 1) {
-      digitalWrite(LED_RED, HIGH); // Light UP RED LED if unsuccessful post
-      digitalWrite(LED_GREEN, LOW);
+      //digitalWrite(LED_RED, HIGH); // Light UP RED LED if unsuccessful post
+      //digitalWrite(LED_GREEN, LOW);
       Serial.println("\nError updating database...\nUpdating later...");      
       if(addIDToEEPROMStack(readTag)) {
         
@@ -489,8 +556,8 @@ void loop() {
       }
       Serial.println("********************************************************");
     } else {        
-      digitalWrite(LED_GREEN, HIGH); // Light UP GREEN LED if successful post
-      digitalWrite(LED_RED, LOW); 
+      //digitalWrite(LED_GREEN, HIGH); // Light UP GREEN LED if successful post
+      //digitalWrite(LED_RED, LOW); 
     }
   }
   
@@ -511,8 +578,8 @@ void loop() {
         
         // post to server and handle if unsuccessfull    
         if(postToServer(url, jsonCharBuffer) > 1) {
-          digitalWrite(LED_RED, HIGH); // Light UP RED LED if unsuccessful post
-          digitalWrite(LED_GREEN, LOW);
+          //digitalWrite(LED_RED, HIGH); // Light UP RED LED if unsuccessful post
+          //digitalWrite(LED_GREEN, LOW);
           Serial.println("\nError updating database again ...\nUpdating later...");      
           if(addIDToEEPROMStack(missedID)) {
             char buffr[200];
@@ -520,8 +587,8 @@ void loop() {
             Serial.println(buffr);      
           }
         } else {
-          digitalWrite(LED_GREEN, HIGH); // Light UP GREEN LED if successful post
-          digitalWrite(LED_RED, LOW); 
+          //digitalWrite(LED_GREEN, HIGH); // Light UP GREEN LED if successful post
+          //digitalWrite(LED_RED, LOW); 
           char buffr[200];
           sprintf(buffr, "Updated tag \"%lu\" successfully !", missedID);
           Serial.println(buffr);      
