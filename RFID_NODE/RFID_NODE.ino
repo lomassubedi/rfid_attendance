@@ -399,9 +399,9 @@ uint32_t timeTrack = 0;
 
 void loop() {
 
-//  uint8_t getChar = 0;
-//  if(Serial.available() > 0)
-  uint8_t getChar = Serial.read();
+  uint8_t getChar = 0;
+  if(Serial.available())
+    getChar = Serial.read();
 //  Serial.write(getChar);
   uint8_t i = 0;
   bool flagPacketReadComplete = false;
@@ -421,7 +421,7 @@ void loop() {
         flagPacketReadComplete = false;
       }
     }
-  } else if(getChar == 'S') {
+  } else if((getChar == 'S') || (getChar == 's')) {
     
     Serial.println("\n--------- Welcome to RFID attendence user setting ----------");
     
